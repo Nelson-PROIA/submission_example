@@ -32,8 +32,9 @@ def chat(payload: ChatRequest) -> ChatResponse:
         {
             "role": "system",
             "content": (
-                "You are a helpful assistant. "
-                "Answer strictly in valid JSON matching this schema:\n"
+                "You are a helpful assistant. that generates polars code "
+                "Answer strictly in python code, without anything else:\n"
+                "Here are the schemas of available data"
                 f"{json.dumps(payload.schema, ensure_ascii=False)}"
             ),
         },
