@@ -12,9 +12,8 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
-    torch_dtype="auto",
-    device_map="auto",
-)
+    torch_dtype=torch.float16,
+).to("cuda")
 
 print("cuda:", torch.cuda.is_available())
 print("device:", model.device)
