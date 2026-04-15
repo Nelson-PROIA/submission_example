@@ -16,12 +16,15 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
 )
 
+
 class ChatRequest(BaseModel):
     message: str
-    tables: dict
+    schema: dict
+
 
 class ChatResponse(BaseModel):
     response: str
+
 
 def strip_code_fence(text: str) -> str:
     text = text.strip()
@@ -33,9 +36,11 @@ def strip_code_fence(text: str) -> str:
         text = text[:-3].strip()
     return text
 
+
 @app.get("/")
 def health():
     return {"status": "ok"}
+
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest) -> ChatResponse:
@@ -49,7 +54,7 @@ def chat(payload: ChatRequest) -> ChatResponse:
                 "Assume the benchmark executor already provides dataset paths and executes the code.\n"
                 "Always assign the final Polars DataFrame to a variable named result.\n"
                 "Use Polars idioms and prefer concise, correct code.\n"
-                f"Available datasets:\n{json.dumps(payload.tables, ensure_ascii=False)}"
+                f"Available datasets:\n{json.dumps(payload.schema, ensure_ascii=False)}"
             ),
         },
         {
