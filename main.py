@@ -1,5 +1,4 @@
 import json
-import re
 import sys
 import traceback
 
@@ -8,7 +7,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-MODEL_NAME = "Qwen/Qwen2.5-Coder-7B-Instruct"
+from parser import strip_code_fence
+
+MODEL_NAME = "mistralai/Devstral-Small-2507"
 
 SYSTEM_PROMPT = """You are an expert Polars engineer. Output ONLY executable Python code. No markdown, no prose, no comments, no explanations.
 
@@ -60,25 +61,6 @@ result = sales.with_columns(
 )
 """
 
-_FENCE_RE = re.compile(r"```(?:python|py)?\s*\n?(.*?)```", re.DOTALL)
-_PROSE_PREFIX_RE = re.compile(
-    r"^(sure[!,.]?|certainly[!,.]?|okay[!,.]?|ok[!,.]?|here(?:'s| is)[^\n]*:?|the code(?: is)?:?|i'll[^\n]*:?)\s*",
-    re.IGNORECASE,
-)
-_TRAILING_PROSE_RE = re.compile(
-    r"\n(?:this |the above |note:|explanation:|# this |# the )",
-    re.IGNORECASE,
-)
-_CHAT_TEMPLATE_TOKENS = (
-    "<|im_end|>",
-    "<|endoftext|>",
-    "<|eot_id|>",
-    "[/INST]",
-    "</s>",
-    "<s>",
-)
-
-
 app = FastAPI()
 
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -105,32 +87,6 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
-
-
-def strip_code_fence(text: str) -> str:
-    text = text.strip()
-
-    for token in _CHAT_TEMPLATE_TOKENS:
-        text = text.replace(token, "")
-    text = text.strip()
-
-    fence_match = _FENCE_RE.search(text)
-    if fence_match:
-        text = fence_match.group(1).strip()
-    else:
-        for _ in range(4):
-            stripped = _PROSE_PREFIX_RE.sub("", text).strip()
-            if stripped == text:
-                break
-            text = stripped
-        if text.startswith("python\n"):
-            text = text[len("python\n"):].lstrip()
-
-    trailing_match = _TRAILING_PROSE_RE.search(text)
-    if trailing_match:
-        text = text[: trailing_match.start()].rstrip()
-
-    return text.strip()
 
 
 @app.get("/")
