@@ -9,7 +9,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from parser import strip_code_fence
 
-MODEL_NAME = "mistralai/Devstral-Small-2507"
+MODEL_NAME = "mistralai/Ministral-8B-Instruct-2410"
 
 SYSTEM_PROMPT = """You are an expert Polars engineer. Output ONLY executable Python code. No markdown, no prose, no comments, no explanations.
 
