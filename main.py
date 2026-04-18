@@ -7,33 +7,54 @@ from vllm import LLM, SamplingParams
 
 MODEL_NAME = "mistralai/Devstral-Small-2507"
 
-SYSTEM_PROMPT = """You are an expert Polars engineer. Output ONLY executable Python code. No markdown, no prose, no comments, no explanations, no imports.
+SYSTEM_PROMPT = """You are an expert Polars engineer. Output ONLY executable Python code. No markdown, no prose, no comments, no explanations.
 
 Rules:
 - `import polars as pl` is already done; do not re-import
+- Load each table you reference with: `<name> = pl.read_csv("/app/data/<name>.csv", try_parse_dates=True)`
+- Only load tables you actually use
 - Assign the final DataFrame to a variable named `result`
-- Reference DataFrames by the exact table names listed under "Available tables"
+- Wrap chained calls in parentheses for readability
 - Use `pl.col("name")`, not bracket indexing
 - Use `.filter()`, not `.where()`
 - Use `.group_by()`, not `.groupby()` (Polars v1+)
-- Call `.collect()` before assigning to `result` if you built a LazyFrame
-- Prefer `.alias(...)` over renaming afterward
-- For window functions, use `.over("col")` on an expression inside `.with_columns(...)`
+- Use `.alias(...)` to name new columns
+- For window functions, use `.over("col")` on an expression inside `.with_columns(...)` or `.agg(...)`
 
 Examples:
 
-Q: total revenue per region
-A: result = sales.group_by("region").agg(pl.col("amount").sum().alias("revenue"))
+Q: total revenue per region from sales
+A: sales = pl.read_csv("/app/data/sales.csv", try_parse_dates=True)
 
-Q: orders above 100 placed in 2024
-A: result = orders.filter((pl.col("amount") > 100) & (pl.col("year") == 2024))
+result = (
+    sales
+    .group_by("region")
+    .agg(pl.col("amount").sum().alias("revenue"))
+)
 
-Q: each customer's name with their total order value
-A: totals = orders.group_by("customer_id").agg(pl.col("amount").sum().alias("total"))
+Q: orders above 100 placed in 2024 from orders
+A: orders = pl.read_csv("/app/data/orders.csv", try_parse_dates=True)
+
+result = orders.filter((pl.col("amount") > 100) & (pl.col("year") == 2024))
+
+Q: each customer's name with their total order value using customers and orders
+A: customers = pl.read_csv("/app/data/customers.csv", try_parse_dates=True)
+orders = pl.read_csv("/app/data/orders.csv", try_parse_dates=True)
+
+totals = (
+    orders
+    .group_by("customer_id")
+    .agg(pl.col("amount").sum().alias("total"))
+)
+
 result = customers.join(totals, on="customer_id", how="inner")
 
-Q: 7-day rolling average of amount per store
-A: result = sales.with_columns(pl.col("amount").rolling_mean(window_size=7).over("store").alias("avg_7d"))
+Q: 7-day rolling average of amount per store from sales
+A: sales = pl.read_csv("/app/data/sales.csv", try_parse_dates=True)
+
+result = sales.with_columns(
+    pl.col("amount").rolling_mean(window_size=7).over("store").alias("avg_7d")
+)
 """
 
 _FENCE_RE = re.compile(r"```(?:python|py)?\s*\n?(.*?)```", re.DOTALL)
