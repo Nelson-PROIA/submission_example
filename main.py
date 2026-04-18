@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-MODEL_NAME = "mistralai/Devstral-Small-2507"
+MODEL_NAME = "Qwen/Qwen2.5-Coder-7B-Instruct"
 
 SYSTEM_PROMPT = """You are an expert Polars engineer. Output ONLY executable Python code. No markdown, no prose, no comments, no explanations.
 
@@ -88,7 +88,14 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
 )
 
-print("Model device:", next(model.parameters()).device)
+print("Model device:", next(model.parameters()).device, flush=True)
+if torch.cuda.is_available():
+    props = torch.cuda.get_device_properties(0)
+    print(
+        f"GPU: {props.name} | VRAM total: {props.total_memory / 1e9:.1f}GB | "
+        f"allocated: {torch.cuda.memory_allocated() / 1e9:.1f}GB",
+        flush=True,
+    )
 
 
 class ChatRequest(BaseModel):
