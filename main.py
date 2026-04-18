@@ -1,5 +1,7 @@
 import json
 import re
+import sys
+import traceback
 
 import torch
 from fastapi import FastAPI
@@ -132,40 +134,43 @@ def health():
 @app.post("/chat", response_model=ChatResponse)
 @torch.inference_mode()
 def chat(payload: ChatRequest) -> ChatResponse:
-    tables_json = json.dumps(payload.tables, ensure_ascii=False)
-    messages = [
-        {
-            "role": "system",
-            "content": f"{SYSTEM_PROMPT}\nAvailable tables: {tables_json}",
-        },
-        {
-            "role": "user",
-            "content": payload.message,
-        },
-    ]
+    try:
+        tables_json = json.dumps(payload.tables, ensure_ascii=False)
+        messages = [
+            {
+                "role": "system",
+                "content": f"{SYSTEM_PROMPT}\nAvailable tables: {tables_json}",
+            },
+            {
+                "role": "user",
+                "content": payload.message,
+            },
+        ]
 
-    text = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
+        text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
 
-    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+        inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=512,
-        do_sample=False,
-        pad_token_id=tokenizer.eos_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-        use_cache=True,
-        stop_strings=["```\n", "\n\n\n"],
-        tokenizer=tokenizer,
-    )
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=512,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+            use_cache=True,
+        )
 
-    response = tokenizer.decode(
-        outputs[0][inputs["input_ids"].shape[1]:],
-        skip_special_tokens=True,
-    )
+        response = tokenizer.decode(
+            outputs[0][inputs["input_ids"].shape[1]:],
+            skip_special_tokens=True,
+        )
 
-    return ChatResponse(response=strip_code_fence(response))
+        return ChatResponse(response=strip_code_fence(response))
+    except Exception as exc:
+        tb = traceback.format_exc()
+        print(f"[CHAT ERROR] {type(exc).__name__}: {exc}\n{tb}", file=sys.stderr, flush=True)
+        return ChatResponse(response=f"# ERROR {type(exc).__name__}: {str(exc)[:400]}")
