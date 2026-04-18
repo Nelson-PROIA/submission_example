@@ -1,6 +1,6 @@
 accelerate==1.13.0
 fastapi==0.135.1
 pydantic==2.10.0
-torch==2.8.0
-transformers==5.3.0
+torch==2.9.0
+transformers==5.5.4
 uvicorn==0.42.0
