@@ -99,22 +99,8 @@ def health():
 def chat(payload: ChatRequest) -> ChatResponse:
     try:
         tables_json = json.dumps(payload.tables, ensure_ascii=False)
-        messages = [
-            {
-                "role": "system",
-                "content": f"{SYSTEM_PROMPT}\nAvailable tables: {tables_json}",
-            },
-            {
-                "role": "user",
-                "content": payload.message,
-            },
-        ]
-
-        text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-        )
+        system_content = f"{SYSTEM_PROMPT}\nAvailable tables: {tables_json}"
+        text = f"[INST]{system_content}\n\n{payload.message}[/INST]"
 
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
