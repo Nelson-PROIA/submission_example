@@ -1,10 +1,9 @@
 import json
 import re
 
-import torch
 from fastapi import FastAPI
 from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from vllm import LLM, SamplingParams
 
 MODEL_NAME = "mistralai/Devstral-Small-2507"
 
@@ -58,14 +57,18 @@ _CHAT_TEMPLATE_TOKENS = (
 
 app = FastAPI()
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    dtype=torch.float16,
-    device_map="auto",
+llm = LLM(
+    model=MODEL_NAME,
+    dtype="float16",
+    gpu_memory_utilization=0.9,
+    max_model_len=8192,
 )
 
-print("Model device:", next(model.parameters()).device)
+sampling_params = SamplingParams(
+    temperature=0.0,
+    max_tokens=512,
+    stop=["```\n", "\n\n\n"],
+)
 
 
 class ChatRequest(BaseModel):
@@ -109,7 +112,6 @@ def health():
 
 
 @app.post("/chat", response_model=ChatResponse)
-@torch.inference_mode()
 def chat(payload: ChatRequest) -> ChatResponse:
     tables_json = json.dumps(payload.tables, ensure_ascii=False)
     messages = [
@@ -123,28 +125,7 @@ def chat(payload: ChatRequest) -> ChatResponse:
         },
     ]
 
-    text = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-
-    inputs = tokenizer(text, return_tensors="pt").to(model.device)
-
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=512,
-        do_sample=False,
-        pad_token_id=tokenizer.eos_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-        use_cache=True,
-        stop_strings=["```\n", "\n\n\n"],
-        tokenizer=tokenizer,
-    )
-
-    response = tokenizer.decode(
-        outputs[0][inputs["input_ids"].shape[1]:],
-        skip_special_tokens=True,
-    )
+    outputs = llm.chat(messages, sampling_params)
+    response = outputs[0].outputs[0].text
 
     return ChatResponse(response=strip_code_fence(response))
